@@ -1,0 +1,974 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>High-Density 3D Ocean Analytics Engine</title>
+  <style>
+    body { margin: 0; overflow: hidden; background-color: #010409; font-family: system-ui, -apple-system, sans-serif; }
+    
+    #ui-panel {
+      position: absolute; top: 15px; left: 15px; background: rgba(15, 23, 42, 0.94);
+      color: white; padding: 15px; border-radius: 8px; z-index: 100; width: 290px;
+      border: 1px solid rgba(255,255,255,0.15); backdrop-filter: blur(8px);
+    }
+    #ui-panel h3 { margin: 0 0 10px 0; color: #38bdf8; font-size: 15px; }
+    .legend-item { display: flex; align-items: center; margin-bottom: 6px; font-size: 12px; }
+    .color-box { width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; flex-shrink: 0; }
+    
+    .section-title { font-size: 11px; text-transform: uppercase; color: #94a3b8; font-weight: bold; margin-top: 10px; border-top: 1px solid #334155; padding-top: 8px; }
+    .btn-group { display: flex; gap: 4px; margin-top: 6px; }
+    .btn-group button { flex: 1; padding: 5px; font-size: 10px; background: #1e293b; color: white; border: 1px solid #334155; border-radius: 4px; cursor: pointer; transition: all 0.2s; }
+    .btn-group button:hover { background: #334155; }
+    .btn-group button.active { background: #0284c7; border-color: #38bdf8; font-weight: bold; }
+
+    .filter-group { margin-top: 8px; }
+    .filter-group label { font-size: 11px; color: #cbd5e1; display: block; margin-bottom: 2px; }
+    .filter-group input[type=range] { width: 100%; accent-color: #38bdf8; cursor: pointer; }
+
+    #file-input { display: none; }
+    .upload-btn { display: block; width: 100%; text-align: center; background: #059669; color: white; border: none; padding: 6px; margin-top: 10px; border-radius: 4px; font-size: 11px; font-weight: bold; cursor: pointer; }
+    .upload-btn:hover { background: #10b981; }
+
+    #chart-panel {
+      position: absolute; top: 15px; right: 15px; background: rgba(15, 23, 42, 0.96);
+      color: white; padding: 16px; border-radius: 10px; z-index: 100; width: 330px;
+      border: 1px solid #38bdf8; display: none; box-shadow: 0 10px 25px rgba(0,0,0,0.7);
+      max-height: 90vh; overflow-y: auto;
+    }
+    #chart-panel h4 { margin: 0 0 8px 0; color: #38bdf8; font-size: 14px; border-bottom: 1px solid #334155; padding-bottom: 5px; }
+    .stat-row { display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 12px; }
+    .stat-label { color: #94a3b8; }
+    .stat-val { font-weight: bold; color: #f8fafc; }
+    
+    .alert-badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; text-transform: uppercase; margin-top: 6px; }
+    .alert-normal { background: rgba(34, 197, 94, 0.2); color: #4ade80; border: 1px solid #22c55e; }
+    .alert-warning { background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid #ef4444; }
+    .alert-marine-heatwave { background: rgba(249, 115, 22, 0.2); color: #fb923c; border: 1px solid #f97316; }
+    .alert-salinity { background: rgba(168, 85, 247, 0.2); color: #c084fc; border: 1px solid #a855f7; }
+    .alert-upwelling { background: rgba(6, 182, 212, 0.2); color: #22d3ee; border: 1px solid #06b6d4; }
+
+    .chart-container { position: relative; height: 140px; width: 100%; margin-top: 8px; }
+    
+    .globe-label {
+      position: absolute; color: rgba(255,255,255,0.9); font-size: 10px; font-weight: bold;
+      pointer-events: none; text-transform: uppercase; letter-spacing: 0.5px;
+      text-shadow: 0 1px 4px rgba(0,0,0,0.9); transform: translate(-50%, -50%);
+      transition: opacity 0.2s;
+    }
+    .label-ocean { color: #38bdf8; font-style: italic; font-size: 12px; letter-spacing: 1.2px; text-shadow: 0 0 6px rgba(0,0,0,0.9); }
+    .label-country { color: #f8fafc; font-size: 9px; opacity: 0.85; }
+    .label-sea { color: #7dd3fc; font-size: 9px; font-style: italic; }
+
+    /* Modal Overlay for Expanded 3D Layered Ocean Block Profile */
+    #block-modal {
+      position: absolute; top: 0; left: 0; width: 100vw; height: 100vh;
+      background: rgba(2, 6, 23, 0.88); backdrop-filter: blur(12px); z-index: 200;
+      display: none; align-items: center; justify-content: center;
+    }
+    #block-card {
+      background: #0f172a; border: 1px solid #38bdf8; border-radius: 12px;
+      width: 95vw; max-width: 1280px; height: 88vh; display: flex; flex-direction: column;
+      position: relative; overflow: hidden; box-shadow: 0 25px 60px rgba(0,0,0,0.9);
+    }
+    #block-card-header {
+      padding: 12px 20px; background: #1e293b; border-bottom: 1px solid #334155;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    #block-card-header h3 { margin: 0; color: #38bdf8; font-size: 16px; }
+    .close-btn {
+      background: #ef4444; border: none; color: white; font-weight: bold;
+      padding: 6px 14px; border-radius: 4px; cursor: pointer; transition: 0.2s;
+    }
+    .close-btn:hover { background: #dc2626; }
+    #block-card-body { display: flex; flex: 1; position: relative; overflow: hidden; }
+    #block-canvas-container { width: 68%; height: 100%; position: relative; background: #020617; }
+    #block-details-side {
+      width: 32%; height: 100%; padding: 20px; box-sizing: border-box;
+      background: #0f172a; border-left: 1px solid #334155; overflow-y: auto;
+    }
+
+    /* Modal Dynamic Particle Color Legend */
+    .modal-legend-box {
+      margin-top: 15px; padding: 12px; background: #1e293b; border-radius: 8px;
+      border: 1px solid #334155;
+    }
+    .modal-legend-box h5 { margin: 0 0 8px 0; color: #38bdf8; font-size: 12px; text-transform: uppercase; }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+</head>
+<body>
+  <div id="ui-panel">
+    <h3>High-Density Ocean Earth</h3>
+    <div class="legend-item"><div class="color-box" style="background:#eab308;"></div> Indian Ocean High-Density Zone</div>
+    <div class="legend-item"><div class="color-box" style="background:#06b6d4;"></div> Global Grid Node</div>
+    <div class="legend-item"><div class="color-box" style="background:#38bdf8;"></div> Maritime Boundaries</div>
+    
+    <div class="section-title">Visual Heatmap Mode</div>
+    <div class="btn-group">
+      <button id="btn-temp" class="active" onclick="setHeatmapMode('temp')">Temperature</button>
+      <button id="btn-do" onclick="setHeatmapMode('do')">Oxygen</button>
+      <button id="btn-ph" onclick="setHeatmapMode('ph')">pH Level</button>
+    </div>
+
+    <div class="section-title">Focus Presets</div>
+    <div class="btn-group">
+      <button onclick="setCameraView('global')">Global</button>
+      <button onclick="setCameraView('indian_ocean')" style="background:#0284c7; font-weight:bold;">Indian Ocean</button>
+      <button onclick="setCameraView('pacific')">Pacific</button>
+    </div>
+
+    <div class="section-title">Vertical Depth Isolator</div>
+    <div class="filter-group">
+      <label>Min Depth: <span id="min-depth-val">0</span>m</label>
+      <input type="range" id="min-depth" min="0" max="4000" step="200" value="0">
+      
+      <label style="margin-top:4px;">Max Depth: <span id="max-depth-val">4000</span>m</label>
+      <input type="range" id="max-depth" min="0" max="4000" step="200" value="4000">
+    </div>
+
+    <button class="upload-btn" onclick="document.getElementById('file-input').click()">📁 Ingest Local CSV Data</button>
+    <input type="file" id="file-input" accept=".csv" onchange="handleCSVUpload(event)">
+  </div>
+
+  <!-- Side Overview Chart Panel -->
+  <div id="chart-panel">
+    <h4 id="point-title">Data Point Profile</h4>
+    <div class="stat-row"><span class="stat-label">Basin/Region:</span><span class="stat-val" id="stat-basin">-</span></div>
+    <div class="stat-row"><span class="stat-label">Location:</span><span class="stat-val" id="stat-coords">-</span></div>
+    <div class="stat-row"><span class="stat-label">Selected Depth:</span><span class="stat-val" id="stat-depth">-</span></div>
+    <div class="stat-row"><span class="stat-label">Temperature:</span><span class="stat-val" id="stat-temp">-</span></div>
+    <div class="stat-row"><span class="stat-label">Salinity:</span><span class="stat-val" id="stat-salinity">-</span></div>
+    <div class="stat-row"><span class="stat-label">Current Velocity:</span><span class="stat-val" id="stat-velocity">-</span></div>
+    <div class="stat-row"><span class="stat-label">Dissolved Oxygen:</span><span class="stat-val" id="stat-do">-</span></div>
+    <div class="stat-row"><span class="stat-label">pH Level:</span><span class="stat-val" id="stat-ph">-</span></div>
+    
+    <div style="margin-top: 6px; border-top: 1px solid #334155; padding-top: 6px;">
+      <span class="stat-label" style="font-size:11px;">Ecosystem & Anomaly Analysis:</span><br>
+      <span id="stat-alert" class="alert-badge alert-normal">Normal</span>
+      <p id="stat-desc" style="font-size: 11px; color: #94a3b8; margin: 4px 0 0 0; line-height: 1.3;">-</p>
+    </div>
+
+    <div class="chart-container">
+      <canvas id="profileChart"></canvas>
+    </div>
+  </div>
+
+  <div id="labels-container"></div>
+
+  <!-- Interactive Expanded 3D Ocean Block Modal Inspection View -->
+  <div id="block-modal">
+    <div id="block-card">
+      <div id="block-card-header">
+        <h3 id="modal-title">Volumetric Ocean Section (Dynamic Waves & Layer Diagnostics)</h3>
+        <button class="close-btn" onclick="closeModal()">Close Inspection ✕</button>
+      </div>
+      <div id="block-card-body">
+        <div id="block-canvas-container"></div>
+        <div id="block-details-side">
+          <h4 id="m-block-location" style="color:#38bdf8; margin:0 0 10px 0;">Location: -</h4>
+          
+          <div class="stat-row"><span class="stat-label">Active Layer Point:</span><span class="stat-val" id="m-node-depth">Surface Layer (0m)</span></div>
+          <div class="stat-row"><span class="stat-label">Temperature:</span><span class="stat-val" id="m-node-temp">-</span></div>
+          <div class="stat-row"><span class="stat-label">Salinity:</span><span class="stat-val" id="m-node-salinity">-</span></div>
+          <div class="stat-row"><span class="stat-label">Dissolved Oxygen:</span><span class="stat-val" id="m-node-do">-</span></div>
+          <div class="stat-row"><span class="stat-label">pH Level:</span><span class="stat-val" id="m-node-ph">-</span></div>
+          <div class="stat-row"><span class="stat-label">Velocity:</span><span class="stat-val" id="m-node-vel">-</span></div>
+
+          <div style="margin-top: 15px; border-top: 1px solid #334155; padding-top: 10px;">
+            <span class="stat-label">Layer Analysis & Conditions:</span><br>
+            <span id="m-node-alert" class="alert-badge alert-normal">Normal</span>
+            <p id="m-node-desc" style="font-size: 11px; color: #94a3b8; margin: 6px 0 0 0; line-height: 1.4;">Select a point inside the 3D depth layers to inspect specific layer parameters.</p>
+          </div>
+
+          <!-- Active Particle Color Scheme Legend -->
+          <div class="modal-legend-box">
+            <h5 id="modal-legend-title">Particle Color Scale (Temperature)</h5>
+            <div id="modal-legend-content"></div>
+          </div>
+
+          <div style="margin-top:15px; font-size:11px; color:#64748b;">
+            💡 <i>Tip: Click any individual node inside the block to inspect that exact layer position.</i>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const globeRadius = 30;
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x010409);
+
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(-25, 15, 80);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    document.body.appendChild(renderer.domElement);
+
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    controls.rotateSpeed = 0.8;
+    controls.zoomSpeed = 1.2;
+    controls.minDistance = 30.5;
+    controls.maxDistance = 200;
+    controls.target.set(0, 0, 0);
+
+    scene.add(new THREE.AmbientLight(0xffffff, 1.1));
+    const sunLight = new THREE.DirectionalLight(0xffffff, 1.3);
+    sunLight.position.set(100, 50, 100);
+    scene.add(sunLight);
+
+    function latLonToVector3(lat, lon, radius, depthMeters = 0) {
+      const phi = (90 - lat) * (Math.PI / 180);
+      const theta = (lon + 180) * (Math.PI / 180);
+      const scaledRadius = radius - (depthMeters * 0.0012);
+
+      const x = -(scaledRadius * Math.sin(phi) * Math.cos(theta));
+      const z = (scaledRadius * Math.sin(phi) * Math.sin(theta));
+      const y = (scaledRadius * Math.cos(phi));
+
+      return new THREE.Vector3(x, y, z);
+    }
+
+    const globeGroup = new THREE.Group();
+    scene.add(globeGroup);
+
+    // Earth Map Textures
+    const textureLoader = new THREE.TextureLoader();
+    const earthTexture = textureLoader.load('https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/earth_atmos_2048.jpg');
+    const nightTexture = textureLoader.load('https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/earth_lights_2048.png');
+
+    const earthGeo = new THREE.SphereGeometry(globeRadius, 128, 128);
+    const earthMat = new THREE.MeshStandardMaterial({
+      map: earthTexture,
+      emissiveMap: nightTexture,
+      emissive: new THREE.Color(0xffff88),
+      emissiveIntensity: 0.25,
+      roughness: 0.5,
+      metalness: 0.1
+    });
+    const earth = new THREE.Mesh(earthGeo, earthMat);
+    globeGroup.add(earth);
+
+    // Ocean Specular Layer
+    const oceanGeo = new THREE.SphereGeometry(globeRadius + 0.05, 128, 128);
+    const oceanMat = new THREE.MeshPhysicalMaterial({
+      color: 0x0284c7,
+      transparent: true,
+      opacity: 0.15,
+      roughness: 0.1,
+      transmission: 0.5
+    });
+    globeGroup.add(new THREE.Mesh(oceanGeo, oceanMat));
+
+    // Country Outlines
+    function drawCountryBoundaries() {
+      const boundaryLines = [
+        [[8,77],[12,75],[15,74],[20,73],[23,68],[28,70],[32,75],[35,77],[31,80],[27,88],[22,89],[16,82],[10,79],[8,77]],
+        [[25,-80],[30,-81],[30,-85],[29,-89],[26,-97],[32,-117],[42,-124],[49,-123],[49,-89],[45,-71],[35,-75],[25,-80]],
+        [[-12,131],[-15,124],[-22,114],[-34,115],[-35,138],[-38,148],[-28,153],[-15,145],[-12,136],[-12,131]],
+        [[37,10],[32,32],[12,43],[-11,40],[-25,33],[-34,25],[-34,18],[-18,12],[0,9],[15,-17],[28,-13],[35,-6],[37,10]],
+        [[11,-75],[7,-58],[-5,-35],[-23,-42],[-40,-62],[-55,-68],[-45,-75],[-18,-70],[-2,-80],[11,-75]],
+        [[28,35],[30,48],[24,56],[16,53],[12,44],[15,42],[28,35]],
+        [[5,95],[-6,105],[-8,114],[-7,115],[-1,104],[5,95]],
+        [[-12,49],[-16,44],[-25,47],[-25,50],[-12,49]]
+      ];
+
+      const material = new THREE.LineBasicMaterial({ color: 0x38bdf8, opacity: 0.5, transparent: true });
+
+      boundaryLines.forEach(coords => {
+        const points = [];
+        coords.forEach(pt => {
+          points.push(latLonToVector3(pt[0], pt[1], globeRadius + 0.12));
+        });
+        const geometry = new THREE.BufferGeometry().setFromPoints(points);
+        const line = new THREE.Line(geometry, material);
+        globeGroup.add(line);
+      });
+    }
+    drawCountryBoundaries();
+
+    // Camera Views
+    window.setCameraView = function(viewType) {
+      if (viewType === 'global') {
+        camera.position.set(0, 0, 95);
+        controls.target.set(0, 0, 0);
+      } else if (viewType === 'indian_ocean') {
+        const pos = latLonToVector3(15.0, 75.0, globeRadius + 38);
+        camera.position.copy(pos);
+        controls.target.set(0, 0, 0);
+      } else if (viewType === 'pacific') {
+        const pos = latLonToVector3(0.0, -150.0, globeRadius + 45);
+        camera.position.copy(pos);
+        controls.target.set(0, 0, 0);
+      }
+      controls.update();
+    };
+
+    // Labels
+    const labelData = [
+      { name: "Indian Ocean", lat: -15, lon: 80, type: "ocean" },
+      { name: "Pacific Ocean", lat: 10, lon: -160, type: "ocean" },
+      { name: "Atlantic Ocean", lat: 20, lon: -40, type: "ocean" },
+      { name: "Southern Ocean", lat: -65, lon: 0, type: "ocean" },
+      { name: "Arabian Sea", lat: 15, lon: 64, type: "sea" },
+      { name: "Bay of Bengal", lat: 14, lon: 88, type: "sea" },
+      { name: "India", lat: 22, lon: 78, type: "country" },
+      { name: "Sri Lanka", lat: 7.8, lon: 80.7, type: "country" },
+      { name: "Maldives", lat: 3.2, lon: 73, type: "country" },
+      { name: "Australia", lat: -25, lon: 133, type: "country" },
+      { name: "Madagascar", lat: -20, lon: 47, type: "country" },
+      { name: "Saudi Arabia", lat: 24, lon: 45, type: "country" },
+      { name: "Indonesia", lat: -0.7, lon: 113, type: "country" },
+      { name: "United States", lat: 38, lon: -95, type: "country" },
+      { name: "Brazil", lat: -14, lon: -51, type: "country" },
+      { name: "China", lat: 35, lon: 104, type: "country" }
+    ];
+
+    const labelsContainer = document.getElementById('labels-container');
+    const labelElements = [];
+
+    labelData.forEach(item => {
+      const div = document.createElement('div');
+      let classType = 'label-country';
+      if (item.type === 'ocean') classType = 'label-ocean';
+      if (item.type === 'sea') classType = 'label-sea';
+
+      div.className = `globe-label ${classType}`;
+      div.innerText = item.name;
+      labelsContainer.appendChild(div);
+      labelElements.push({ element: div, lat: item.lat, lon: item.lon });
+    });
+
+    function updateLabels() {
+      const tempV = new THREE.Vector3();
+
+      labelElements.forEach(item => {
+        const localPos = latLonToVector3(item.lat, item.lon, globeRadius + 0.6);
+        const worldPos = localPos.clone().applyMatrix4(globeGroup.matrixWorld);
+        tempV.copy(worldPos);
+        tempV.project(camera);
+
+        const vectorFromCam = worldPos.clone().sub(camera.position).normalize();
+        const surfaceNormal = worldPos.clone().sub(globeGroup.position).normalize();
+        const isVisible = vectorFromCam.dot(surfaceNormal) < -0.15;
+
+        if (isVisible && tempV.z < 1) {
+          const x = (tempV.x *  .5 + .5) * window.innerWidth;
+          const y = (tempV.y * -.5 + .5) * window.innerHeight;
+          item.element.style.left = `${x}px`;
+          item.element.style.top = `${y}px`;
+          item.element.style.display = 'block';
+          
+          const distToCam = camera.position.distanceTo(worldPos);
+          item.element.style.opacity = distToCam > 115 ? '0' : '1';
+        } else {
+          item.element.style.display = 'none';
+        }
+      });
+    }
+
+    // High Density Node Engine
+    const interactiveObjects = [];
+    let selectedMesh = null;
+    let currentMode = 'temp';
+
+    const depthLevels = [0, 100, 300, 600, 1000, 1500, 2500, 4000];
+
+    function calculateColor(mode, temp, oxygen, ph) {
+      if (mode === 'do') return parseFloat(oxygen) < 3.2 ? 0xef4444 : (parseFloat(oxygen) < 5.5 ? 0xeab308 : 0x06b6d4);
+      if (mode === 'ph') return parseFloat(ph) < 7.85 ? 0xef4444 : (parseFloat(ph) < 8.05 ? 0xf59e0b : 0x10b981);
+      return temp > 28 ? 0xef4444 : (temp > 24 ? 0xf43f5e : (temp > 15 ? 0x06b6d4 : 0x1e1b4b));
+    }
+
+    function generateOceanNode(lat, lon, depthMeters) {
+      const pos = latLonToVector3(lat, lon, globeRadius, depthMeters);
+      
+      let basin = "Global Ocean Sector";
+      let isIndianOcean = (lat >= -45 && lat <= 30 && lon >= 30 && lon <= 115);
+      
+      if (isIndianOcean) {
+        if (lat > 10 && lon < 75) basin = "Arabian Sea Basin";
+        else if (lat > 10 && lon >= 75) basin = "Bay of Bengal Basin";
+        else if (lat > -20) basin = "Equatorial Indian Ocean Basin";
+        else basin = "South Indian Ocean / Madagascar Basin";
+      }
+
+      let baseTemp = isIndianOcean ? 28.2 : 24.8;
+      
+      // Inject parameter variations for different anomaly types
+      let tempOffset = (Math.random() * 0.4 - 0.2);
+      let salOffset = (Math.random() * 0.1);
+      let oxOffset = (Math.random() * 0.3);
+      let phOffset = (Math.random() * 0.03);
+      let velOffset = (Math.random() * 0.1);
+
+      // Specific Spatial Triggers for Diverse Anomalies
+      if (depthMeters <= 100 && lat > 10 && lon > 80 && lon < 95) {
+        tempOffset += 3.5; // Trigger Marine Heatwave in Bay of Bengal
+      } else if (depthMeters <= 300 && lat > -15 && lat < -5 && lon > 40 && lon < 60) {
+        salOffset += 3.8; // High Salinity Anomaly in Subtropical Gyre
+      } else if (lat > 10 && lat < 22 && lon > 55 && lon < 72 && depthMeters <= 200) {
+        tempOffset -= 6.0; // Coastal Upwelling Cold Anomaly in West Arabian Sea
+        velOffset += 0.8;
+      } else if (depthMeters <= 100 && lat < -30 && lon > 70 && lon < 90) {
+        phOffset -= 0.45; // Ocean Acidification Anomaly in Southern Indian Ocean
+      }
+
+      const temp = parseFloat((baseTemp - (depthMeters / 120) * 1.1 + tempOffset).toFixed(2));
+      const salinity = parseFloat((34.5 + (depthMeters * 0.0004) + salOffset).toFixed(2));
+      const oxygen = Math.max(0.8, 7.5 - depthMeters * 0.0028 + oxOffset).toFixed(2);
+      const ph = (8.2 - depthMeters * 0.00012 + phOffset).toFixed(2);
+      const velocity = (Math.max(0.02, 0.9 - depthMeters * 0.00025 + velOffset)).toFixed(2);
+
+      // Multi-Anomaly Diagnostic Engine
+      let alertMsg = "Stable Marine Stratification";
+      let desc = "Normal thermocline profile with standard dissolved oxygen and salinity levels.";
+      let alertClass = "alert-normal";
+
+      if (depthMeters <= 100 && temp >= 30.5) {
+        alertMsg = "🔥 Marine Heatwave (MHW)";
+        desc = "Extreme sea surface thermal peak driving thermal stress, coral bleaching risks, and altered surface evaporation.";
+        alertClass = "alert-marine-heatwave";
+      } else if (parseFloat(ph) <= 7.82) {
+        alertMsg = "🧪 Ocean Acidification Event";
+        desc = "Severe decline in oceanic pH balance threatening calcifying marine organisms and shell development.";
+        alertClass = "alert-warning";
+      } else if (salinity >= 38.0) {
+        alertMsg = "🧂 High Salinity Intrusion";
+        desc = "Anomalous evaporation-dominated hyper-saline cell affecting local seawater density and vertical mixing.";
+        alertClass = "alert-salinity";
+      } else if (depthMeters <= 200 && temp <= 18.0 && lat > 5 && lat < 25 && lon > 50 && lon < 75) {
+        alertMsg = "🌊 Deep Upwelling Surge";
+        desc = "Strong wind-driven divergence drawing nutrient-rich, cold deep water rapidly toward the surface zone.";
+        alertClass = "alert-upwelling";
+      } else if (depthMeters >= 300 && depthMeters <= 1000 && parseFloat(oxygen) <= 2.5) {
+        alertMsg = "⚠️ Hypoxia / OMZ Core";
+        desc = "Subsurface Hypoxic Zone (Oxygen Minimum Layer) causing severe biological stress to pelagic species.";
+        alertClass = "alert-warning";
+      }
+
+      const color = calculateColor(currentMode, temp, oxygen, ph);
+      
+      const size = isIndianOcean ? 0.38 : 0.28;
+      const geometry = new THREE.BoxGeometry(size, size, size);
+      const material = new THREE.MeshLambertMaterial({ color: color });
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.position.copy(pos);
+      mesh.lookAt(0,0,0);
+
+      mesh.userData = {
+        title: isIndianOcean ? `Indian Ocean Data Block (${depthMeters}m)` : `Global Ocean Block (${depthMeters}m)`,
+        basin: basin,
+        coords: `${lat.toFixed(1)}°N, ${lon.toFixed(1)}°E`,
+        lat: lat,
+        lon: lon,
+        depthMeters: depthMeters,
+        depth: `${depthMeters} m`,
+        temp: `${temp} °C`,
+        rawTemp: temp,
+        salinity: `${salinity} PSU`,
+        rawSalinity: salinity,
+        velocity: `${velocity} m/s`,
+        do: `${oxygen} mg/L`,
+        ph: ph,
+        alertMsg: alertMsg,
+        desc: desc,
+        alertClass: alertClass,
+        originalColor: color
+      };
+
+      globeGroup.add(mesh);
+      interactiveObjects.push(mesh);
+    }
+
+    // Populate Denser Ocean Coordinates
+    for (let lat = -65; lat <= 65; lat += 8) {
+      for (let lon = -180; lon <= 180; lon += 10) {
+        const isLand = (lat > 10 && lat < 35 && lon > 68 && lon < 88) ||
+                       (lat > -35 && lat < -10 && lon > 115 && lon < 155) ||
+                       (lat > -35 && lat < 35 && lon > -20 && lon < 50 && lat < 35);
+
+        if (!isLand) {
+          depthLevels.forEach(d => {
+            if (lat >= -50 && lat <= 30 && lon >= 30 && lon <= 115) {
+              generateOceanNode(lat, lon, d);
+              generateOceanNode(lat + 3, lon + 3, d);
+            } else {
+              if (lat % 16 === 0 && lon % 16 === 0) generateOceanNode(lat, lon, d);
+            }
+          });
+        }
+      }
+    }
+
+    // Heatmap Selector
+    window.setHeatmapMode = function(mode) {
+      currentMode = mode;
+      document.querySelectorAll('.btn-group button').forEach(btn => {
+        if (btn.id.startsWith('btn-')) btn.classList.remove('active');
+      });
+      document.getElementById(`btn-${mode}`).classList.add('active');
+
+      interactiveObjects.forEach(obj => {
+        const u = obj.userData;
+        const color = calculateColor(mode, u.rawTemp, parseFloat(u.do), parseFloat(u.ph));
+        u.originalColor = color;
+        if (obj !== selectedMesh) {
+          obj.material.color.setHex(color);
+        }
+      });
+    };
+
+    // CSV Ingestion
+    window.handleCSVUpload = function(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      Papa.parse(file, {
+        header: true,
+        dynamicTyping: true,
+        complete: function(results) {
+          results.data.forEach(row => {
+            if (row.latitude && row.longitude) {
+              const pos = latLonToVector3(row.latitude, row.longitude, globeRadius, row.depth || 0);
+              const box = new THREE.Mesh(
+                new THREE.BoxGeometry(0.5, 0.5, 0.5),
+                new THREE.MeshLambertMaterial({ color: 0xeab308 })
+              );
+              box.position.copy(pos);
+              box.lookAt(0,0,0);
+              box.userData = {
+                title: `Custom Ingest Data Block`,
+                basin: `User Dataset Ingest`,
+                coords: `${row.latitude}°N, ${row.longitude}°E`,
+                lat: row.latitude,
+                lon: row.longitude,
+                depthMeters: row.depth || 0,
+                depth: `${row.depth || 0} m`,
+                temp: `${row.temperature || 24} °C`,
+                rawTemp: row.temperature || 24,
+                salinity: `35.0 PSU`,
+                rawSalinity: 35.0,
+                velocity: `0.45 m/s`,
+                do: `5.8 mg/L`,
+                ph: `8.05`,
+                alertMsg: `Custom Ingest Record`,
+                desc: `Custom ingested field observation dataset record.`,
+                alertClass: "alert-normal",
+                originalColor: 0xeab308
+              };
+              globeGroup.add(box);
+              interactiveObjects.push(box);
+            }
+          });
+          alert(`Successfully ingested ${results.data.length} custom data blocks!`);
+        }
+      });
+    };
+
+    // Depth Isolator
+    const minSlider = document.getElementById('min-depth');
+    const maxSlider = document.getElementById('max-depth');
+
+    function filterDepthLayers() {
+      const minD = parseInt(minSlider.value);
+      const maxD = parseInt(maxSlider.value);
+      document.getElementById('min-depth-val').innerText = minD;
+      document.getElementById('max-depth-val').innerText = maxD;
+
+      interactiveObjects.forEach(obj => {
+        const d = obj.userData.depthMeters;
+        if (d !== undefined) obj.visible = (d >= minD && d <= maxD);
+      });
+    }
+
+    minSlider.addEventListener('input', filterDepthLayers);
+    maxSlider.addEventListener('input', filterDepthLayers);
+
+    // Side Panel Chart
+    let profileChart = null;
+    function renderVerticalChart(surfaceTemp) {
+      const ctx = document.getElementById('profileChart').getContext('2d');
+      const depths = [0, 100, 300, 600, 1000, 1500, 2500, 4000];
+      const temps = depths.map((d, idx) => Math.max(1.8, (surfaceTemp - idx * 2.2)).toFixed(1));
+
+      if (profileChart) profileChart.destroy();
+      profileChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: depths.map(d => `${d}m`),
+          datasets: [{
+            label: 'Column Temp (°C)',
+            data: temps,
+            borderColor: '#38bdf8',
+            backgroundColor: 'rgba(56, 189, 248, 0.15)',
+            fill: true,
+            tension: 0.35,
+            pointRadius: 3
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: { ticks: { color: '#94a3b8', font: { size: 9 } }, grid: { color: '#334155' } },
+            y: { ticks: { color: '#94a3b8', font: { size: 9 } }, grid: { color: '#334155' } }
+          },
+          plugins: { legend: { display: false } }
+        }
+      });
+    }
+
+    // Raycast Setup
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+
+    window.addEventListener('click', (event) => {
+      if (event.clientX < 320 && event.clientY < 500) return;
+      if (document.getElementById('block-modal').style.display === 'flex') return;
+
+      mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+      mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+      raycaster.setFromCamera(mouse, camera);
+      const visibleObjects = interactiveObjects.filter(o => o.visible);
+      const intersects = raycaster.intersectObjects(visibleObjects);
+
+      if (intersects.length > 0) {
+        if (selectedMesh) {
+          selectedMesh.material.color.setHex(selectedMesh.userData.originalColor);
+          selectedMesh.scale.set(1, 1, 1);
+        }
+
+        selectedMesh = intersects[0].object;
+        selectedMesh.material.color.setHex(0x38bdf8);
+        selectedMesh.scale.set(1.8, 1.8, 1.8);
+
+        const selected = selectedMesh.userData;
+        document.getElementById('chart-panel').style.display = 'block';
+        document.getElementById('point-title').innerText = selected.title;
+        document.getElementById('stat-basin').innerText = selected.basin;
+        document.getElementById('stat-coords').innerText = selected.coords;
+        document.getElementById('stat-depth').innerText = selected.depth;
+        document.getElementById('stat-temp').innerText = selected.temp;
+        document.getElementById('stat-salinity').innerText = selected.salinity;
+        document.getElementById('stat-velocity').innerText = selected.velocity;
+        document.getElementById('stat-do').innerText = selected.do;
+        document.getElementById('stat-ph').innerText = selected.ph;
+        document.getElementById('stat-desc').innerText = selected.desc;
+
+        const alertBadge = document.getElementById('stat-alert');
+        alertBadge.innerText = selected.alertMsg;
+        alertBadge.className = `alert-badge ${selected.alertClass}`;
+
+        renderVerticalChart(selected.rawTemp || 26.0);
+
+        // Open 3D Ocean Layered Block Modal
+        open3DOceanBlockModal(selected);
+      }
+    });
+
+    // -------------------------------------------------------------
+    // REALISTIC EXPANDED OCEAN BLOCK WITH WAVES & DYNAMIC LEGEND
+    // -------------------------------------------------------------
+    let modalScene, modalCamera, modalRenderer, modalControls;
+    let blockPoints = [];
+    let modalRaycaster = new THREE.Raycaster();
+    let modalMouse = new THREE.Vector2();
+    let activeBlockPoint = null;
+    let waveGeometry = null;
+    let animFrameId = null;
+
+    function renderModalLegend() {
+      const titleEl = document.getElementById('modal-legend-title');
+      const contentEl = document.getElementById('modal-legend-content');
+
+      if (currentMode === 'temp') {
+        titleEl.innerText = "Particle Legend: Temperature (°C)";
+        contentEl.innerHTML = `
+          <div class="legend-item"><div class="color-box" style="background:#ef4444;"></div> Extreme Marine Heatwave Peak (&gt; 28°C)</div>
+          <div class="legend-item"><div class="color-box" style="background:#f43f5e;"></div> Warm Surface Water (24°C - 28°C)</div>
+          <div class="legend-item"><div class="color-box" style="background:#06b6d4;"></div> Intermediate Thermocline (15°C - 24°C)</div>
+          <div class="legend-item"><div class="color-box" style="background:#1e1b4b;"></div> Abyssal Cold (&lt; 15°C)</div>
+        `;
+      } else if (currentMode === 'do') {
+        titleEl.innerText = "Particle Legend: Oxygen (mg/L)";
+        contentEl.innerHTML = `
+          <div class="legend-item"><div class="color-box" style="background:#06b6d4;"></div> Oxygen Rich Layer (&gt; 5.5 mg/L)</div>
+          <div class="legend-item"><div class="color-box" style="background:#eab308;"></div> Moderate Oxygen (3.2 - 5.5 mg/L)</div>
+          <div class="legend-item"><div class="color-box" style="background:#ef4444;"></div> Oxygen Minimum / Hypoxic Zone (&lt; 3.2 mg/L)</div>
+        `;
+      } else if (currentMode === 'ph') {
+        titleEl.innerText = "Particle Legend: pH Level";
+        contentEl.innerHTML = `
+          <div class="legend-item"><div class="color-box" style="background:#10b981;"></div> Standard Alkaline Ocean (&gt; 8.05)</div>
+          <div class="legend-item"><div class="color-box" style="background:#f59e0b;"></div> Moderate pH Offset (7.85 - 8.05)</div>
+          <div class="legend-item"><div class="color-box" style="background:#ef4444;"></div> Acidification Threat Zone (&lt; 7.85)</div>
+        `;
+      }
+    }
+
+    function open3DOceanBlockModal(pointData) {
+      const modal = document.getElementById('block-modal');
+      modal.style.display = 'flex';
+
+      document.getElementById('m-block-location').innerText = `${pointData.basin} (${pointData.coords})`;
+      renderModalLegend();
+
+      const container = document.getElementById('block-canvas-container');
+      container.innerHTML = ''; // Clear prior view
+
+      // Create Modal 3D Scene
+      modalScene = new THREE.Scene();
+      modalScene.background = new THREE.Color(0x020617);
+
+      modalCamera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 100);
+      modalCamera.position.set(18, 14, 24);
+
+      modalRenderer = new THREE.WebGLRenderer({ antialias: true });
+      modalRenderer.setSize(container.clientWidth, container.clientHeight);
+      container.appendChild(modalRenderer.domElement);
+
+      modalControls = new THREE.OrbitControls(modalCamera, modalRenderer.domElement);
+      modalControls.enableDamping = true;
+      modalControls.target.set(0, -4.5, 0);
+
+      const light1 = new THREE.DirectionalLight(0xffffff, 1.4);
+      light1.position.set(15, 25, 15);
+      modalScene.add(light1);
+      modalScene.add(new THREE.AmbientLight(0xffffff, 0.7));
+
+      // Expanded Ocean Block Boundaries
+      const blockWidth = 12, blockHeight = 12, blockDepth = 12;
+
+      // Realistic Dynamic Wave Surface Plane
+      waveGeometry = new THREE.PlaneGeometry(blockWidth, blockDepth, 32, 32);
+      waveGeometry.rotateX(-Math.PI / 2);
+
+      const waveMaterial = new THREE.MeshPhysicalMaterial({
+        color: 0x0284c7,
+        transparent: true,
+        opacity: 0.65,
+        roughness: 0.1,
+        transmission: 0.6,
+        clearcoat: 1.0,
+        clearcoatRoughness: 0.1,
+        side: THREE.DoubleSide
+      });
+      const waveMesh = new THREE.Mesh(waveGeometry, waveMaterial);
+      waveMesh.position.set(0, 1.5, 0);
+      modalScene.add(waveMesh);
+
+      // Outer Water Volume Mesh
+      const volumeGeo = new THREE.BoxGeometry(blockWidth, blockHeight, blockDepth);
+      const volumeMat = new THREE.MeshPhysicalMaterial({
+        color: 0x0284c7,
+        transparent: true,
+        opacity: 0.12,
+        roughness: 0.2,
+        transmission: 0.8,
+        depthWrite: false
+      });
+      const volumeMesh = new THREE.Mesh(volumeGeo, volumeMat);
+      volumeMesh.position.set(0, -4.5, 0);
+      modalScene.add(volumeMesh);
+
+      // Wireframe Outline
+      const wireGeo = new THREE.EdgesGeometry(volumeGeo);
+      const wireMat = new THREE.LineBasicMaterial({ color: 0x38bdf8, opacity: 0.4, transparent: true });
+      const wireframe = new THREE.LineSegments(wireGeo, wireMat);
+      wireframe.position.copy(volumeMesh.position);
+      modalScene.add(wireframe);
+
+      // Build Expanded Depth Layers with Diverse Anomaly Diagnostics
+      const layers = [
+        { depth: 0, label: "Surface Layer (0m)", y: 1.0 },
+        { depth: 200, label: "Epipelagic Layer (200m)", y: -1.2 },
+        { depth: 600, label: "Mesopelagic Layer (600m)", y: -3.5 },
+        { depth: 1500, label: "Bathypelagic Layer (1500m)", y: -6.2 },
+        { depth: 3000, label: "Abyssopelagic Layer (3000m)", y: -9.0 }
+      ];
+
+      blockPoints = [];
+
+      layers.forEach(layer => {
+        // Horizontal Depth Plane Guide
+        const planeGeo = new THREE.PlaneGeometry(blockWidth - 0.4, blockDepth - 0.4);
+        const planeMat = new THREE.MeshBasicMaterial({
+          color: 0x38bdf8,
+          transparent: true,
+          opacity: 0.08,
+          side: THREE.DoubleSide
+        });
+        const plane = new THREE.Mesh(planeGeo, planeMat);
+        plane.rotation.x = Math.PI / 2;
+        plane.position.set(0, layer.y, 0);
+        modalScene.add(plane);
+
+        // Grid of Nodes in Expanded Spatial Array
+        const baseTemp = pointData.rawTemp || 25;
+        const baseSal = pointData.rawSalinity || 35.0;
+
+        for (let x = -4.5; x <= 4.5; x += 2.25) {
+          for (let z = -4.5; z <= 4.5; z += 2.25) {
+            
+            // Random variation generator across the block grid
+            let pTemp = Math.max(1.5, (baseTemp - (Math.abs(layer.y) * 2.2) + (Math.random() * 0.6 - 0.3))).toFixed(1);
+            let pSal = (baseSal + (Math.abs(layer.y) * 0.12) + (Math.random() * 0.2 - 0.1)).toFixed(2);
+            let pDO = Math.max(0.8, 7.5 - (Math.abs(layer.y) * 0.6) + (Math.random() * 0.4 - 0.2)).toFixed(2);
+            let pPH = (8.2 - (Math.abs(layer.y) * 0.04) + (Math.random() * 0.04 - 0.02)).toFixed(2);
+            let pVel = (Math.max(0.04, 0.85 - Math.abs(layer.y) * 0.08 + (Math.random() * 0.05))).toFixed(2);
+
+            // Inject layer-specific regional anomalies inside the inspection block
+            if (layer.depth === 0 && x > 2.0 && z > 2.0) {
+              pTemp = (31.2 + Math.random() * 0.8).toFixed(1); // Surface Heatwave Corner
+            } else if (layer.depth === 200 && x < -2.0) {
+              pSal = (38.8 + Math.random() * 0.4).toFixed(2); // Salinity Anomaly Node
+            } else if (layer.depth === 0 && z < -2.0) {
+              pTemp = (16.2 + Math.random() * 0.5).toFixed(1); // Cold Upwelling Spot
+              pVel = (1.45 + Math.random() * 0.2).toFixed(2);
+            } else if (layer.depth >= 1500 && x > 1.0) {
+              pPH = (7.76 - Math.random() * 0.05).toFixed(2); // Deep Ocean Acidification Node
+            }
+
+            const particleColor = calculateColor(currentMode, parseFloat(pTemp), pDO, pPH);
+
+            const pGeo = new THREE.SphereGeometry(0.28, 16, 16);
+            const pMat = new THREE.MeshStandardMaterial({
+              color: particleColor,
+              roughness: 0.2,
+              emissive: particleColor,
+              emissiveIntensity: 0.35
+            });
+            const pointMesh = new THREE.Mesh(pGeo, pMat);
+            pointMesh.position.set(x, layer.y, z);
+
+            pointMesh.userData = {
+              layerLabel: layer.label,
+              depth: `${layer.depth} m`,
+              temp: `${pTemp} °C`,
+              rawTemp: parseFloat(pTemp),
+              salinity: `${pSal} PSU`,
+              rawSalinity: parseFloat(pSal),
+              do: `${pDO} mg/L`,
+              ph: pPH,
+              vel: `${pVel} m/s`,
+              originalColor: particleColor
+            };
+
+            modalScene.add(pointMesh);
+            blockPoints.push(pointMesh);
+          }
+        }
+      });
+
+      // Raycasting Inspection inside Modal Block Scene with Dynamic Multi-Anomaly Classifier
+      modalRenderer.domElement.onclick = (evt) => {
+        const rect = modalRenderer.domElement.getBoundingClientRect();
+        modalMouse.x = ((evt.clientX - rect.left) / rect.width) * 2 - 1;
+        modalMouse.y = -((evt.clientY - rect.top) / rect.height) * 2 + 1;
+
+        modalRaycaster.setFromCamera(modalMouse, modalCamera);
+        const intersects = modalRaycaster.intersectObjects(blockPoints);
+
+        if (intersects.length > 0) {
+          if (activeBlockPoint) {
+            activeBlockPoint.material.color.setHex(activeBlockPoint.userData.originalColor);
+            activeBlockPoint.scale.set(1, 1, 1);
+          }
+          activeBlockPoint = intersects[0].object;
+          activeBlockPoint.material.color.setHex(0x38bdf8);
+          activeBlockPoint.scale.set(1.9, 1.9, 1.9);
+
+          const u = activeBlockPoint.userData;
+          document.getElementById('m-node-depth').innerText = `${u.layerLabel}`;
+          document.getElementById('m-node-temp').innerText = u.temp;
+          document.getElementById('m-node-salinity').innerText = u.salinity;
+          document.getElementById('m-node-do').innerText = u.do;
+          document.getElementById('m-node-ph').innerText = u.ph;
+          document.getElementById('m-node-vel').innerText = u.vel;
+
+          const alertBadge = document.getElementById('m-node-alert');
+          
+          // Dynamic Multi-Anomaly Classification Logic
+          if (u.rawTemp >= 30.5) {
+            alertBadge.innerText = "🔥 Marine Heatwave Spike";
+            alertBadge.className = "alert-badge alert-marine-heatwave";
+            document.getElementById('m-node-desc').innerText = "Extreme localized thermal anomaly. High marine heatwave risk impacting local biological productivity.";
+          } else if (u.rawSalinity >= 38.0) {
+            alertBadge.innerText = "🧂 Hyper-Saline Anomaly";
+            alertBadge.className = "alert-badge alert-salinity";
+            document.getElementById('m-node-desc').innerText = "High salinity cell detected due to intense evaporation or localized salt finger convection.";
+          } else if (u.rawTemp <= 17.5 && parseInt(u.depth) <= 200) {
+            alertBadge.innerText = "🌊 Cold Upwelling Jet";
+            alertBadge.className = "alert-badge alert-upwelling";
+            document.getElementById('m-node-desc').innerText = "Cold, high-velocity upwelling plume drawing sub-surface water upward.";
+          } else if (parseFloat(u.ph) <= 7.82) {
+            alertBadge.innerText = "🧪 Ocean Acidification Trigger";
+            alertBadge.className = "alert-badge alert-warning";
+            document.getElementById('m-node-desc').innerText = "Critically low pH level detected. Corrosive water conditions impacting calcium carbonate saturation.";
+          } else if (parseFloat(u.do) <= 2.8) {
+            alertBadge.innerText = "⚠️ Hypoxic OMZ Core";
+            alertBadge.className = "alert-badge alert-warning";
+            document.getElementById('m-node-desc').innerText = "Severely depleted oxygen retention layer forming an active Oxygen Minimum Zone.";
+          } else {
+            alertBadge.innerText = "Normal Layer Dynamics";
+            alertBadge.className = "alert-badge alert-normal";
+            document.getElementById('m-node-desc').innerText = "Stable oceanographic parameters with normal physical and chemical equilibrium.";
+          }
+        }
+      };
+
+      // Modal Render Animation Loop (Realistic Wave displacement)
+      let clock = new THREE.Clock();
+      function renderModal() {
+        if (modal.style.display === 'flex') {
+          animFrameId = requestAnimationFrame(renderModal);
+          
+          const elapsedTime = clock.getElapsedTime();
+          const pos = waveGeometry.attributes.position;
+
+          for (let i = 0; i < pos.count; i++) {
+            const u = pos.getX(i);
+            const v = pos.getZ(i);
+            const z = Math.sin(u * 0.8 + elapsedTime * 2.2) * 0.22 + Math.cos(v * 0.8 + elapsedTime * 1.8) * 0.22;
+            pos.setY(i, z);
+          }
+          pos.needsUpdate = true;
+
+          modalControls.update();
+          modalRenderer.render(modalScene, modalCamera);
+        }
+      }
+      renderModal();
+    }
+
+    window.closeModal = function() {
+      document.getElementById('block-modal').style.display = 'none';
+      if (animFrameId) cancelAnimationFrame(animFrameId);
+    };
+
+    // Main Render Loop
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      updateLabels();
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updatePrecisionMatrix ? camera.updatePrecisionMatrix() : camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
+</body>
+</html>
